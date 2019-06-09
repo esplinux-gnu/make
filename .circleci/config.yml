@@ -1,51 +1,29 @@
 version: 2.1
 
-executors:
-  alpine:
+jobs:
+  build:
     docker:
       - image: alpine:3.9
-    working_directory: ~/
+    working_directory: /project
     environment:
       VERSION: bootstrap
       ESPBUILD_VERSION: 0.01
       GHR_VERSION: v0.12.1
-
-jobs:
-  prepare:
-    executor: alpine
     steps:
-      - run: apk add ca-certificates curl go git build-base
-      - run: mkdir -p ~/workspace/tools/bin
-      - run: curl -LO https://github.com/esplinux/espbuild/releases/download/$ESPBUILD_VERSION/espbuild.tar.gz
-      - run: cd ~/workspace/tools; tar xf ~/espbuild.tar.gz
-      - run: go mod init .
-      - run: go get github.com/tcnksm/ghr@$GHR_VERSION
-      - run: cp /root/go/bin/ghr ~/workspace/tools/bin
-      - store_artifacts:
-          path: ~/workspace/tools
-      - persist_to_workspace:
-          root: ~/workspace
-          paths:
-            - tools
-
-  make:
-    executor: alpine
-    steps:
-      - run: apk add ca-certificates 
+      - run: apk add ca-certificates curl git go build-base
       - checkout
-      - attach_workspace:
-          at: ~/workspace
       - run:
           name: Build
           command: |
-            export PATH=~/workspace/tools/bin:$PATH
-            espbuild make.conf
-            ghr $GHR_FLAGS -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${VERSION} ~/package
+            curl -LO https://github.com/esplinux/espbuild/releases/download/$ESPBUILD_VERSION/espbuild-static.tar.gz
+            tar xf espbuild-static.tar.gz
+            bin/espbuild ${CIRCLE_PROJECT_REPONAME}.conf
+            go mod init .
+            go get github.com/tcnksm/ghr@$GHR_VERSION
+            ~/go/bin/ghr -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${VERSION} /package
 
 workflows:
+  version: 2
   build:
     jobs:
-      - prepare
-      - make:
-          requires:
-            - prepare
+      - build
